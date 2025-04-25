@@ -1,38 +1,63 @@
 package com.example.matrixcalculator
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import android.widget.*
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.children
-import androidx.core.widget.addTextChangedListener
-import java.lang.Exception
+import androidx.lifecycle.Observer
+import com.example.matrixcalculator.model.Matrix
+import com.example.matrixcalculator.model.MatrixResult
+import com.example.matrixcalculator.model.OperationType
+import com.example.matrixcalculator.viewmodel.MatrixViewModel
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.textfield.TextInputEditText
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var matrixOperations: MatrixOperations
-    private lateinit var spinnerOperation: Spinner
-    private lateinit var buttonCalculate: Button
-    private lateinit var editTextRows1: EditText
-    private lateinit var editTextCols1: EditText
-    private lateinit var editTextRows2: EditText
-    private lateinit var editTextCols2: EditText
-    private lateinit var buttonSetDimensions: Button
+    private val viewModel: MatrixViewModel by viewModels()
+
+    // UI Components
+    private lateinit var spinnerOperation: AutoCompleteTextView
+    private lateinit var buttonCalculate: MaterialButton
+    private lateinit var editTextRows1: TextInputEditText
+    private lateinit var editTextCols1: TextInputEditText
+    private lateinit var editTextRows2: TextInputEditText
+    private lateinit var editTextCols2: TextInputEditText
+    private lateinit var buttonSetDimensions: MaterialButton
     private lateinit var gridLayoutMatrix1: GridLayout
     private lateinit var gridLayoutMatrix2: GridLayout
     private lateinit var gridLayoutResult: GridLayout
-    private lateinit var scrollViewResult: ScrollView
+    private lateinit var cardMatrix1: MaterialCardView
+    private lateinit var cardMatrix2: MaterialCardView
+    private lateinit var cardResult: MaterialCardView
     private lateinit var textViewError: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize matrix operations
-        matrixOperations = MatrixOperations()
-
         // Initialize UI elements
+        initializeViews()
+
+        // Set up operation dropdown
+        setupOperationDropdown()
+
+        // Add validation to dimension inputs
+        setupDimensionValidation()
+
+        // Set up button listeners
+        setupButtonListeners()
+
+        // Observe ViewModel state
+        observeViewModel()
+    }
+
+    private fun initializeViews() {
         spinnerOperation = findViewById(R.id.spinnerOperation)
         buttonCalculate = findViewById(R.id.buttonCalculate)
         editTextRows1 = findViewById(R.id.editTextRows1)
@@ -43,250 +68,213 @@ class MainActivity : AppCompatActivity() {
         gridLayoutMatrix1 = findViewById(R.id.gridLayoutMatrix1)
         gridLayoutMatrix2 = findViewById(R.id.gridLayoutMatrix2)
         gridLayoutResult = findViewById(R.id.gridLayoutResult)
-        scrollViewResult = findViewById(R.id.scrollViewResult)
+        cardMatrix1 = findViewById(R.id.cardMatrix1)
+        cardMatrix2 = findViewById(R.id.cardMatrix2)
+        cardResult = findViewById(R.id.cardResult)
         textViewError = findViewById(R.id.textViewError)
 
-        // Set up operation spinner
-        ArrayAdapter.createFromResource(
-            this,
-            R.array.matrix_operations,
-            android.R.layout.simple_spinner_item
-        ).also { adapter ->
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            spinnerOperation.adapter = adapter
-        }
-
-        // Add validation to dimension inputs
-        setupDimensionValidation()
-
-        // Set up button listeners
-        buttonSetDimensions.setOnClickListener {
-            setupMatrixGrids()
-        }
-
-        buttonCalculate.setOnClickListener {
-            calculateResult()
-        }
-
-        // Set initial visibility
-        scrollViewResult.visibility = View.GONE
+        // Initially hide matrix cards and error
+        cardMatrix1.visibility = View.GONE
+        cardMatrix2.visibility = View.GONE
+        cardResult.visibility = View.GONE
         textViewError.visibility = View.GONE
+        buttonCalculate.isEnabled = false
+    }
+
+    private fun setupOperationDropdown() {
+        val operations = OperationType.values().map { it.displayName }.toTypedArray()
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_dropdown_item_1line,
+            operations
+        )
+        spinnerOperation.setAdapter(adapter)
+        spinnerOperation.setText(operations[0], false)
+
+        spinnerOperation.setOnItemClickListener { _, _, position, _ ->
+            viewModel.setOperation(OperationType.values()[position])
+        }
     }
 
     private fun setupDimensionValidation() {
         val dimensionInputs = listOf(editTextRows1, editTextCols1, editTextRows2, editTextCols2)
 
         dimensionInputs.forEach { editText ->
-            editText.addTextChangedListener {
-                val text = it.toString()
-                if (text.isNotEmpty()) {
-                    try {
-                        val value = text.toInt()
-                        if (value <= 0) {
-                            editText.error = "Value must be positive"
-                        } else if (value > 10) {
-                            editText.error = "Maximum dimension is 10"
-                        } else {
-                            editText.error = null
+            editText.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+                override fun afterTextChanged(s: Editable?) {
+                    val text = s.toString()
+                    if (text.isNotEmpty()) {
+                        try {
+                            val value = text.toInt()
+                            if (value <= 0) {
+                                editText.error = "Value must be positive"
+                            } else if (value > 10) {
+                                editText.error = "Maximum dimension is 10"
+                            } else {
+                                editText.error = null
+                            }
+                        } catch (e: NumberFormatException) {
+                            editText.error = "Invalid number"
                         }
-                    } catch (e: NumberFormatException) {
-                        editText.error = "Invalid number"
                     }
                 }
-            }
+            })
         }
+    }
+
+    private fun setupButtonListeners() {
+        buttonSetDimensions.setOnClickListener {
+            setupMatrixGrids()
+        }
+
+        buttonCalculate.setOnClickListener {
+            viewModel.calculate()
+        }
+    }
+
+    private fun observeViewModel() {
+        viewModel.matrix1.observe(this, Observer { matrix ->
+            matrix?.let {
+                updateMatrixUI(matrix, gridLayoutMatrix1, 1)
+                cardMatrix1.visibility = View.VISIBLE
+            }
+        })
+
+        viewModel.matrix2.observe(this, Observer { matrix ->
+            matrix?.let {
+                updateMatrixUI(matrix, gridLayoutMatrix2, 2)
+                cardMatrix2.visibility = View.VISIBLE
+            }
+        })
+
+        viewModel.result.observe(this, Observer { result ->
+            result?.let {
+                displayResult(it)
+                cardResult.visibility = View.VISIBLE
+            } ?: run {
+                cardResult.visibility = View.GONE
+            }
+        })
+
+        viewModel.error.observe(this, Observer { errorMessage ->
+            errorMessage?.let {
+                textViewError.text = it
+                textViewError.visibility = View.VISIBLE
+            } ?: run {
+                textViewError.visibility = View.GONE
+            }
+        })
+
+        viewModel.isCalculating.observe(this, Observer { isCalculating ->
+            buttonCalculate.isEnabled = !isCalculating
+            if (isCalculating) {
+                buttonCalculate.text = "Calculating..."
+            } else {
+                buttonCalculate.text = "Calculate"
+            }
+        })
     }
 
     private fun setupMatrixGrids() {
         try {
-            val rows1 = editTextRows1.text.toString().toInt()
-            val cols1 = editTextCols1.text.toString().toInt()
-            val rows2 = editTextRows2.text.toString().toInt()
-            val cols2 = editTextCols2.text.toString().toInt()
+            viewModel.clearError()
+
+            val rows1 = editTextRows1.text.toString().toIntOrNull() ?: 0
+            val cols1 = editTextCols1.text.toString().toIntOrNull() ?: 0
+            val rows2 = editTextRows2.text.toString().toIntOrNull() ?: 0
+            val cols2 = editTextCols2.text.toString().toIntOrNull() ?: 0
 
             // Validate dimensions
             if (rows1 <= 0 || cols1 <= 0 || rows2 <= 0 || cols2 <= 0) {
-                showError("All dimensions must be positive numbers")
+                viewModel.clearError()
+                textViewError.text = "All dimensions must be positive numbers"
+                textViewError.visibility = View.VISIBLE
                 return
             }
 
             if (rows1 > 10 || cols1 > 10 || rows2 > 10 || cols2 > 10) {
-                showError("Maximum dimension is 10")
+                viewModel.clearError()
+                textViewError.text = "Maximum dimension is 10"
+                textViewError.visibility = View.VISIBLE
                 return
             }
 
-            // Clear existing grids
-            gridLayoutMatrix1.removeAllViews()
-            gridLayoutMatrix2.removeAllViews()
-            gridLayoutResult.removeAllViews()
-            scrollViewResult.visibility = View.GONE
-            textViewError.visibility = View.GONE
+            // Set dimensions in ViewModel
+            viewModel.setMatrix1Dimensions(rows1, cols1)
+            viewModel.setMatrix2Dimensions(rows2, cols2)
 
-            // Set up grid layouts - use fixed width
-            gridLayoutMatrix1.rowCount = rows1
-            gridLayoutMatrix1.columnCount = cols1
-            gridLayoutMatrix2.rowCount = rows2
-            gridLayoutMatrix2.columnCount = cols2
-
-            // Create input fields for Matrix 1
-            for (i in 0 until rows1) {
-                for (j in 0 until cols1) {
-                    val editText = EditText(this)
-                    editText.hint = "0"
-                    editText.minWidth = 100
-                    editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                            android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or
-                            android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
-
-                    // Use simpler layout params for better visibility
-                    val params = GridLayout.LayoutParams()
-                    params.width = GridLayout.LayoutParams.WRAP_CONTENT
-                    params.height = GridLayout.LayoutParams.WRAP_CONTENT
-                    params.setMargins(8, 8, 8, 8)
-                    params.rowSpec = GridLayout.spec(i)
-                    params.columnSpec = GridLayout.spec(j)
-
-                    editText.layoutParams = params
-                    gridLayoutMatrix1.addView(editText)
-                }
-            }
-
-            // Create input fields for Matrix 2
-            for (i in 0 until rows2) {
-                for (j in 0 until cols2) {
-                    val editText = EditText(this)
-                    editText.hint = "0"
-                    editText.minWidth = 100
-                    editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                            android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or
-                            android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
-
-                    // Use simpler layout params for better visibility
-                    val params = GridLayout.LayoutParams()
-                    params.width = GridLayout.LayoutParams.WRAP_CONTENT
-                    params.height = GridLayout.LayoutParams.WRAP_CONTENT
-                    params.setMargins(8, 8, 8, 8)
-                    params.rowSpec = GridLayout.spec(i)
-                    params.columnSpec = GridLayout.spec(j)
-
-                    editText.layoutParams = params
-                    gridLayoutMatrix2.addView(editText)
-                }
-            }
-
-            // Ensure grids are visible
-            gridLayoutMatrix1.visibility = View.VISIBLE
-            gridLayoutMatrix2.visibility = View.VISIBLE
-
+            // Enable calculate button
             buttonCalculate.isEnabled = true
+
         } catch (e: NumberFormatException) {
-            showError("Please enter valid dimensions")
+            viewModel.clearError()
+            textViewError.text = "Please enter valid dimensions"
+            textViewError.visibility = View.VISIBLE
         }
     }
 
-    private fun calculateResult() {
-        try {
-            val rows1 = editTextRows1.text.toString().toInt()
-            val cols1 = editTextCols1.text.toString().toInt()
-            val rows2 = editTextRows2.text.toString().toInt()
-            val cols2 = editTextCols2.text.toString().toInt()
+    private fun updateMatrixUI(matrix: Matrix, gridLayout: GridLayout, matrixNumber: Int) {
+        gridLayout.removeAllViews()
+        gridLayout.rowCount = matrix.rows
+        gridLayout.columnCount = matrix.cols
 
-            // Get matrix values
-            val matrix1 = getMatrixValues(gridLayoutMatrix1, rows1, cols1)
-            val matrix2 = getMatrixValues(gridLayoutMatrix2, rows2, cols2)
+        for (i in 0 until matrix.rows) {
+            for (j in 0 until matrix.cols) {
+                val editText = EditText(this)
+                editText.hint = "0"
+                editText.minWidth = 100
+                editText.setText(if (matrix.elements[i][j] != 0.0) matrix.elements[i][j].toString() else "")
+                editText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                        android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or
+                        android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
 
-            // Perform the selected operation
-            val operation = spinnerOperation.selectedItem.toString()
-            val resultMatrix = when (operation) {
-                "Addition" -> {
-                    if (rows1 != rows2 || cols1 != cols2) {
-                        showError("Matrices must have the same dimensions for addition")
-                        return
+                // Add value change listener
+                editText.addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+                    override fun afterTextChanged(s: Editable?) {
+                        val value = s.toString().toDoubleOrNull() ?: 0.0
+                        if (matrixNumber == 1) {
+                            viewModel.updateMatrix1Value(i, j, value)
+                        } else {
+                            viewModel.updateMatrix2Value(i, j, value)
+                        }
                     }
-                    matrixOperations.addMatrices(rows1, cols1, matrix1, rows2, cols2, matrix2)
-                }
-                "Subtraction" -> {
-                    if (rows1 != rows2 || cols1 != cols2) {
-                        showError("Matrices must have the same dimensions for subtraction")
-                        return
-                    }
-                    matrixOperations.subtractMatrices(rows1, cols1, matrix1, rows2, cols2, matrix2)
-                }
-                "Multiplication" -> {
-                    if (cols1 != rows2) {
-                        showError("Number of columns in first matrix must equal number of rows in second matrix for multiplication")
-                        return
-                    }
-                    matrixOperations.multiplyMatrices(rows1, cols1, matrix1, rows2, cols2, matrix2)
-                }
-                "Division" -> {
-                    if (rows2 != cols2) {
-                        showError("Second matrix must be square for division (to compute inverse)")
-                        return
-                    }
-                    matrixOperations.divideMatrices(rows1, cols1, matrix1, rows2, cols2, matrix2)
-                }
-                else -> null
+                })
+
+                // Set up layout params
+                val params = GridLayout.LayoutParams()
+                params.width = GridLayout.LayoutParams.WRAP_CONTENT
+                params.height = GridLayout.LayoutParams.WRAP_CONTENT
+                params.setMargins(8, 8, 8, 8)
+                params.rowSpec = GridLayout.spec(i)
+                params.columnSpec = GridLayout.spec(j)
+
+                editText.layoutParams = params
+                gridLayout.addView(editText)
             }
-
-            if (resultMatrix == null) {
-                showError("Operation failed. Please check the matrix dimensions and values.")
-                return
-            }
-
-            // Calculate result dimensions
-            val resultRows: Int
-            val resultCols: Int
-            when (operation) {
-                "Addition", "Subtraction" -> {
-                    resultRows = rows1
-                    resultCols = cols1
-                }
-                "Multiplication", "Division" -> {
-                    resultRows = rows1
-                    resultCols = cols2
-                }
-                else -> {
-                    resultRows = 0
-                    resultCols = 0
-                }
-            }
-
-            // Display the result
-            displayResult(resultMatrix, resultRows, resultCols)
-            textViewError.visibility = View.GONE
-            scrollViewResult.visibility = View.VISIBLE
-        } catch (e: Exception) {
-            showError("Calculation error: ${e.message}")
         }
     }
 
-    private fun getMatrixValues(gridLayout: GridLayout, rows: Int, cols: Int): DoubleArray {
-        val values = DoubleArray(rows * cols)
-        for (i in 0 until rows) {
-            for (j in 0 until cols) {
-                val index = i * cols + j
-                val editText = gridLayout.children.elementAt(index) as EditText
-                val text = editText.text.toString()
-                values[index] = if (text.isNotEmpty()) text.toDouble() else 0.0
-            }
-        }
-        return values
-    }
-
-    private fun displayResult(matrix: DoubleArray, rows: Int, cols: Int) {
+    private fun displayResult(result: MatrixResult) {
         gridLayoutResult.removeAllViews()
-        gridLayoutResult.rowCount = rows
-        gridLayoutResult.columnCount = cols
+        gridLayoutResult.rowCount = result.rows
+        gridLayoutResult.columnCount = result.cols
 
-        for (i in 0 until rows) {
-            for (j in 0 until cols) {
+        for (i in 0 until result.rows) {
+            for (j in 0 until result.cols) {
                 val textView = TextView(this)
-                val value = matrix[i * cols + j]
+                val value = result.elements[i][j]
                 textView.text = String.format("%.4f", value)
                 textView.textSize = 16f
                 textView.setPadding(10, 10, 10, 10)
-                textView.setBackgroundColor(0xFFE8F5E9.toInt())
+                textView.setBackgroundColor(ContextCompat.getColor(this, R.color.secondaryLightColor))
 
                 // Use simpler layout params for better visibility
                 val params = GridLayout.LayoutParams()
@@ -300,15 +288,5 @@ class MainActivity : AppCompatActivity() {
                 gridLayoutResult.addView(textView)
             }
         }
-
-        // Ensure the result is visible
-        gridLayoutResult.visibility = View.VISIBLE
-        scrollViewResult.visibility = View.VISIBLE
-    }
-
-    private fun showError(message: String) {
-        textViewError.text = message
-        textViewError.visibility = View.VISIBLE
-        scrollViewResult.visibility = View.GONE
     }
 }
