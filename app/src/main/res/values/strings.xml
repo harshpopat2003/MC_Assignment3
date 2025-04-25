@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WiFi Signal Logger</string>
+    <string name="scan_button">Start Scan</string>
+    <string name="new_scan">New Scan</string>
+    <string name="compare_locations">Compare Locations</string>
+    <string name="location_name_hint">Enter location name</string>
+    <string name="scanning_in_progress">Scanning in progress...</string>
+    <string name="scan_complete">Scan complete!</string>
+    <string name="error_empty_location">Please enter a location name</string>
+    <string name="error_permission_denied">Location permission is required for WiFi scanning</string>
+</resources>
