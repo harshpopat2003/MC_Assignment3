@@ -17,6 +17,10 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
 
+/**
+ * MainActivity that manages the user interface for matrix calculations.
+ * It initializes the UI, validates input, and handles user actions to perform matrix operations.
+ */
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MatrixViewModel by viewModels()
@@ -37,6 +41,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardResult: MaterialCardView
     private lateinit var textViewError: TextView
 
+    /**
+     * Sets up the activity, initializes the UI components, and sets up listeners for user interaction.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -53,10 +60,13 @@ class MainActivity : AppCompatActivity() {
         // Set up button listeners
         setupButtonListeners()
 
-        // Observe ViewModel state
+        // Observe ViewModel state for updates
         observeViewModel()
     }
 
+    /**
+     * Initialize the views (UI components).
+     */
     private fun initializeViews() {
         spinnerOperation = findViewById(R.id.spinnerOperation)
         buttonCalculate = findViewById(R.id.buttonCalculate)
@@ -81,6 +91,9 @@ class MainActivity : AppCompatActivity() {
         buttonCalculate.isEnabled = false
     }
 
+    /**
+     * Set up the operation dropdown (spinner) to select matrix operation (e.g., addition, subtraction).
+     */
     private fun setupOperationDropdown() {
         val operations = OperationType.values().map { it.displayName }.toTypedArray()
         val adapter = ArrayAdapter(
@@ -91,11 +104,15 @@ class MainActivity : AppCompatActivity() {
         spinnerOperation.setAdapter(adapter)
         spinnerOperation.setText(operations[0], false)
 
+        // Set the selected operation based on user's choice
         spinnerOperation.setOnItemClickListener { _, _, position, _ ->
             viewModel.setOperation(OperationType.values()[position])
         }
     }
 
+    /**
+     * Add validation to ensure valid dimensions (positive values between 1 and 10).
+     */
     private fun setupDimensionValidation() {
         val dimensionInputs = listOf(editTextRows1, editTextCols1, editTextRows2, editTextCols2)
 
@@ -126,6 +143,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Set up button listeners for actions like setting matrix dimensions and triggering calculations.
+     */
     private fun setupButtonListeners() {
         buttonSetDimensions.setOnClickListener {
             setupMatrixGrids()
@@ -136,7 +156,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Observe the ViewModel to react to changes in the matrix, result, error, and calculation state.
+     */
     private fun observeViewModel() {
+        // Observe matrix1 changes and update the UI
         viewModel.matrix1.observe(this, Observer { matrix ->
             matrix?.let {
                 updateMatrixUI(matrix, gridLayoutMatrix1, 1)
@@ -144,6 +168,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // Observe matrix2 changes and update the UI
         viewModel.matrix2.observe(this, Observer { matrix ->
             matrix?.let {
                 updateMatrixUI(matrix, gridLayoutMatrix2, 2)
@@ -151,6 +176,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // Observe calculation result and update the UI
         viewModel.result.observe(this, Observer { result ->
             result?.let {
                 displayResult(it)
@@ -160,6 +186,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // Observe error messages and display them in the UI
         viewModel.error.observe(this, Observer { errorMessage ->
             errorMessage?.let {
                 textViewError.text = it
@@ -169,6 +196,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // Observe calculation status to disable/enable calculate button
         viewModel.isCalculating.observe(this, Observer { isCalculating ->
             buttonCalculate.isEnabled = !isCalculating
             if (isCalculating) {
@@ -179,6 +207,9 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    /**
+     * Setup matrix grids for input based on user-defined dimensions.
+     */
     private fun setupMatrixGrids() {
         try {
             viewModel.clearError()
@@ -217,11 +248,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Updates the matrix UI dynamically by creating EditTexts for each element.
+     */
     private fun updateMatrixUI(matrix: Matrix, gridLayout: GridLayout, matrixNumber: Int) {
         gridLayout.removeAllViews()
         gridLayout.rowCount = matrix.rows
         gridLayout.columnCount = matrix.cols
 
+        // Loop through the matrix rows and columns to create EditText for each element
         for (i in 0 until matrix.rows) {
             for (j in 0 until matrix.cols) {
                 val editText = EditText(this)
@@ -232,7 +267,7 @@ class MainActivity : AppCompatActivity() {
                         android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or
                         android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
 
-                // Add value change listener
+                // Add value change listener to update the matrix in the ViewModel
                 editText.addTextChangedListener(object : TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
@@ -248,7 +283,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
 
-                // Set up layout params
+                // Set up layout params for better view alignment
                 val params = GridLayout.LayoutParams()
                 params.width = GridLayout.LayoutParams.WRAP_CONTENT
                 params.height = GridLayout.LayoutParams.WRAP_CONTENT
@@ -262,11 +297,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Displays the calculation result in the result grid.
+     */
     private fun displayResult(result: MatrixResult) {
         gridLayoutResult.removeAllViews()
         gridLayoutResult.rowCount = result.rows
         gridLayoutResult.columnCount = result.cols
 
+        // Loop through the result and add TextViews to show the matrix values
         for (i in 0 until result.rows) {
             for (j in 0 until result.cols) {
                 val textView = TextView(this)

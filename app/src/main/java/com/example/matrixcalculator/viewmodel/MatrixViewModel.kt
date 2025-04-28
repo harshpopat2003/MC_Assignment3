@@ -8,29 +8,37 @@ import com.example.matrixcalculator.model.Matrix
 import com.example.matrixcalculator.model.MatrixResult
 import com.example.matrixcalculator.model.OperationType
 
+/**
+ * ViewModel class for managing matrix-related operations and state.
+ * This class handles the logic for matrix initialization, updating values, and performing operations.
+ */
 class MatrixViewModel : ViewModel() {
-    private val matrixOperations = MatrixOperations()
+    private val matrixOperations = MatrixOperations()  // Object to handle matrix operations (addition, subtraction, etc.)
 
-    // State management
+    // LiveData properties to manage state
     private val _matrix1 = MutableLiveData<Matrix>()
-    val matrix1: LiveData<Matrix> = _matrix1
+    val matrix1: LiveData<Matrix> = _matrix1  // Exposed as LiveData to be observed in UI
 
     private val _matrix2 = MutableLiveData<Matrix>()
-    val matrix2: LiveData<Matrix> = _matrix2
+    val matrix2: LiveData<Matrix> = _matrix2  // Exposed as LiveData to be observed in UI
 
     private val _result = MutableLiveData<MatrixResult>()
-    val result: LiveData<MatrixResult> = _result
+    val result: LiveData<MatrixResult> = _result  // Exposed as LiveData to show operation result
 
     private val _error = MutableLiveData<String>()
-    val error: LiveData<String> = _error
+    val error: LiveData<String> = _error  // Exposed as LiveData to show error messages
 
     private val _isCalculating = MutableLiveData(false)
-    val isCalculating: LiveData<Boolean> = _isCalculating
+    val isCalculating: LiveData<Boolean> = _isCalculating  // Exposed as LiveData to indicate if a calculation is in progress
 
-    // Selected operation
+    // LiveData for the selected operation (e.g., ADDITION, MULTIPLICATION)
     private val _selectedOperation = MutableLiveData(OperationType.ADDITION)
     val selectedOperation: LiveData<OperationType> = _selectedOperation
 
+    /**
+     * Sets the dimensions for Matrix 1 and initializes it with zero values.
+     * Ensures that the dimensions are valid (between 1 and 10).
+     */
     fun setMatrix1Dimensions(rows: Int, cols: Int) {
         if (rows <= 0 || cols <= 0 || rows > 10 || cols > 10) {
             _error.value = "Invalid matrix dimensions. Please use values between 1 and 10."
@@ -43,6 +51,10 @@ class MatrixViewModel : ViewModel() {
         _result.value = null // Clear previous result
     }
 
+    /**
+     * Sets the dimensions for Matrix 2 and initializes it with zero values.
+     * Ensures that the dimensions are valid (between 1 and 10).
+     */
     fun setMatrix2Dimensions(rows: Int, cols: Int) {
         if (rows <= 0 || cols <= 0 || rows > 10 || cols > 10) {
             _error.value = "Invalid matrix dimensions. Please use values between 1 and 10."
@@ -55,24 +67,37 @@ class MatrixViewModel : ViewModel() {
         _result.value = null // Clear previous result
     }
 
+    /**
+     * Updates the value of a specific element in Matrix 1 at the given row and column.
+     */
     fun updateMatrix1Value(row: Int, col: Int, value: Double) {
         val currentMatrix = _matrix1.value ?: return
-        val newElements = currentMatrix.elements.map { it.clone() }.toTypedArray()
-        newElements[row][col] = value
-        _matrix1.value = Matrix(currentMatrix.rows, currentMatrix.cols, newElements)
+        val newElements = currentMatrix.elements.map { it.clone() }.toTypedArray()  // Create a new copy of the matrix elements
+        newElements[row][col] = value  // Update the value at the specified position
+        _matrix1.value = Matrix(currentMatrix.rows, currentMatrix.cols, newElements)  // Update Matrix 1
     }
 
+    /**
+     * Updates the value of a specific element in Matrix 2 at the given row and column.
+     */
     fun updateMatrix2Value(row: Int, col: Int, value: Double) {
         val currentMatrix = _matrix2.value ?: return
-        val newElements = currentMatrix.elements.map { it.clone() }.toTypedArray()
-        newElements[row][col] = value
-        _matrix2.value = Matrix(currentMatrix.rows, currentMatrix.cols, newElements)
+        val newElements = currentMatrix.elements.map { it.clone() }.toTypedArray()  // Create a new copy of the matrix elements
+        newElements[row][col] = value  // Update the value at the specified position
+        _matrix2.value = Matrix(currentMatrix.rows, currentMatrix.cols, newElements)  // Update Matrix 2
     }
 
+    /**
+     * Sets the operation to be performed on the matrices (e.g., ADDITION, MULTIPLICATION).
+     */
     fun setOperation(operation: OperationType) {
         _selectedOperation.value = operation
     }
 
+    /**
+     * Validates the matrices and the selected operation before performing a calculation.
+     * Checks for compatible dimensions and operation-specific constraints.
+     */
     fun validateCalculation(): Boolean {
         val matrix1 = _matrix1.value
         val matrix2 = _matrix2.value
@@ -115,6 +140,9 @@ class MatrixViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Performs the matrix calculation based on the selected operation and updates the result.
+     */
     fun calculate() {
         // Clear previous errors and results
         _error.value = null
@@ -129,21 +157,20 @@ class MatrixViewModel : ViewModel() {
             val matrix1 = _matrix1.value!!
             val matrix2 = _matrix2.value!!
 
-            // Flatten the matrices
+            // Flatten the matrices to 1D arrays for easier calculation
             val flatMatrix1 = flattenMatrix(matrix1)
             val flatMatrix2 = flattenMatrix(matrix2)
 
-            // Determine result dimensions
+            // Determine result dimensions based on the operation
             val (resultRows, resultCols) = when(_selectedOperation.value) {
                 OperationType.ADDITION, OperationType.SUBTRACTION ->
                     Pair(matrix1.rows, matrix1.cols)
                 OperationType.MULTIPLICATION, OperationType.DIVISION ->
                     Pair(matrix1.rows, matrix2.cols)
-                else ->
-                    Pair(0, 0)
+                else -> Pair(0, 0)
             }
 
-            // Perform the calculation
+            // Perform the calculation based on the selected operation
             val resultArray = when(_selectedOperation.value) {
                 OperationType.ADDITION ->
                     matrixOperations.addMatrices(
@@ -168,13 +195,14 @@ class MatrixViewModel : ViewModel() {
                 else -> null
             }
 
+            // If calculation fails, show error
             if (resultArray == null) {
                 _error.value = "Calculation failed. Please check your matrices."
                 _isCalculating.value = false
                 return
             }
 
-            // Convert the flat array back to a 2D array
+            // Convert the result array back to a 2D array
             val resultMatrix = unflattenMatrix(resultArray, resultRows, resultCols)
             _result.value = MatrixResult(
                 resultRows,
@@ -186,10 +214,13 @@ class MatrixViewModel : ViewModel() {
         } catch (e: Exception) {
             _error.value = "Calculation error: ${e.message}"
         } finally {
-            _isCalculating.value = false
+            _isCalculating.value = false  // Reset the calculation state
         }
     }
 
+    /**
+     * Flattens a 2D matrix to a 1D array for easier manipulation.
+     */
     private fun flattenMatrix(matrix: Matrix): DoubleArray {
         val result = DoubleArray(matrix.rows * matrix.cols)
         var index = 0
@@ -203,6 +234,9 @@ class MatrixViewModel : ViewModel() {
         return result
     }
 
+    /**
+     * Converts a flattened 1D array back into a 2D matrix with the specified number of rows and columns.
+     */
     private fun unflattenMatrix(flatArray: DoubleArray, rows: Int, cols: Int): Array<DoubleArray> {
         val result = Array(rows) { DoubleArray(cols) }
 
@@ -215,6 +249,9 @@ class MatrixViewModel : ViewModel() {
         return result
     }
 
+    /**
+     * Clears any errors currently stored in the ViewModel state.
+     */
     fun clearError() {
         _error.value = null
     }
