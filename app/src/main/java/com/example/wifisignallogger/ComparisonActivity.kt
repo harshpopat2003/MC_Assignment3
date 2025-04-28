@@ -21,18 +21,18 @@ import kotlin.math.absoluteValue
 
 class ComparisonActivity : AppCompatActivity() {
 
-    private lateinit var wifiRepository: WifiRepository
-    private lateinit var tableLayoutStats: TableLayout
-    private lateinit var recyclerViewMatrix1: RecyclerView
-    private lateinit var recyclerViewMatrix2: RecyclerView
-    private lateinit var recyclerViewMatrix3: RecyclerView
-    private lateinit var textViewLocation1Name: TextView
-    private lateinit var textViewLocation2Name: TextView
-    private lateinit var textViewLocation3Name: TextView
+    private lateinit var wifiRepository: WifiRepository // Repository for accessing database
+    private lateinit var tableLayoutStats: TableLayout // TableLayout for showing statistics
+    private lateinit var recyclerViewMatrix1: RecyclerView // First matrix RecyclerView
+    private lateinit var recyclerViewMatrix2: RecyclerView // Second matrix RecyclerView
+    private lateinit var recyclerViewMatrix3: RecyclerView // Third matrix RecyclerView
+    private lateinit var textViewLocation1Name: TextView // TextView for location 1 name
+    private lateinit var textViewLocation2Name: TextView // TextView for location 2 name
+    private lateinit var textViewLocation3Name: TextView // TextView for location 3 name
 
-    private lateinit var matrixAdapter1: WifiMatrixAdapter
-    private lateinit var matrixAdapter2: WifiMatrixAdapter
-    private lateinit var matrixAdapter3: WifiMatrixAdapter
+    private lateinit var matrixAdapter1: WifiMatrixAdapter // Adapter for matrix 1
+    private lateinit var matrixAdapter2: WifiMatrixAdapter // Adapter for matrix 2
+    private lateinit var matrixAdapter3: WifiMatrixAdapter // Adapter for matrix 3
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +48,7 @@ class ComparisonActivity : AppCompatActivity() {
         textViewLocation3Name = findViewById(R.id.textViewLocation3Name)
 
         // Initialize database and repository
-        val database = AppDatabase.getDatabase(this)
+        val database = AppDatabase.getDatabase(this) // Get database instance
         wifiRepository = WifiRepository(database.locationDao(), database.wifiReadingDao())
 
         // Setup RecyclerViews
@@ -59,51 +59,40 @@ class ComparisonActivity : AppCompatActivity() {
     }
 
     private fun setupMatrixRecyclerViews() {
-        // Matrix 1
-        matrixAdapter1 = WifiMatrixAdapter()
+        matrixAdapter1 = WifiMatrixAdapter() // Setup matrix 1
         recyclerViewMatrix1.layoutManager = GridLayoutManager(this, 10) // 10x10 grid
         recyclerViewMatrix1.adapter = matrixAdapter1
 
-        // Matrix 2
-        matrixAdapter2 = WifiMatrixAdapter()
-        recyclerViewMatrix2.layoutManager = GridLayoutManager(this, 10) // 10x10 grid
+        matrixAdapter2 = WifiMatrixAdapter() // Setup matrix 2
+        recyclerViewMatrix2.layoutManager = GridLayoutManager(this, 10)
         recyclerViewMatrix2.adapter = matrixAdapter2
 
-        // Matrix 3
-        matrixAdapter3 = WifiMatrixAdapter()
-        recyclerViewMatrix3.layoutManager = GridLayoutManager(this, 10) // 10x10 grid
+        matrixAdapter3 = WifiMatrixAdapter() // Setup matrix 3
+        recyclerViewMatrix3.layoutManager = GridLayoutManager(this, 10)
         recyclerViewMatrix3.adapter = matrixAdapter3
     }
 
     private fun loadLocationsData() {
         wifiRepository.allLocationsWithReadings.observe(this, Observer { locationsWithReadings ->
             if (locationsWithReadings.size >= 3) {
-                // Get the 3 most recent locations
-                val topLocations = locationsWithReadings.sortedByDescending { it.location.timestamp }.take(3)
-
-                // Display location data
-                displayLocationData(topLocations)
-
-                // Calculate and display statistics
-                calculateStatistics(topLocations)
+                val topLocations = locationsWithReadings.sortedByDescending { it.location.timestamp }.take(3) // Take 3 most recent locations
+                displayLocationData(topLocations) // Display location names and matrices
+                calculateStatistics(topLocations) // Calculate and display stats
             }
         })
     }
 
     private fun displayLocationData(locations: List<LocationWithReadings>) {
         if (locations.size >= 3) {
-            // Location 1 (most recent)
-            val location1 = locations[0]
+            val location1 = locations[0] // Most recent location
             textViewLocation1Name.text = location1.location.name
             matrixAdapter1.setData(location1.readings)
 
-            // Location 2
-            val location2 = locations[1]
+            val location2 = locations[1] // Second most recent
             textViewLocation2Name.text = location2.location.name
             matrixAdapter2.setData(location2.readings)
 
-            // Location 3
-            val location3 = locations[2]
+            val location3 = locations[2] // Third most recent
             textViewLocation3Name.text = location3.location.name
             matrixAdapter3.setData(location3.readings)
         }
@@ -111,59 +100,51 @@ class ComparisonActivity : AppCompatActivity() {
 
     private fun calculateStatistics(locations: List<LocationWithReadings>) {
         lifecycleScope.launch {
-            // Clear existing rows (except header)
-            while (tableLayoutStats.childCount > 1) {
+            while (tableLayoutStats.childCount > 1) { // Clear previous rows except header
                 tableLayoutStats.removeViewAt(1)
             }
 
-            // Add stats for each location
             for (locationWithReadings in locations) {
                 val location = locationWithReadings.location
                 val readings = locationWithReadings.readings
 
-                // Calculate stats
-                val minRssi = readings.minOfOrNull { it.rssi } ?: 0
-                val maxRssi = readings.maxOfOrNull { it.rssi } ?: 0
-                val avgRssi = readings.map { it.rssi }.average()
-                val range = (maxRssi - minRssi).absoluteValue
+                val minRssi = readings.minOfOrNull { it.rssi } ?: 0 // Minimum RSSI
+                val maxRssi = readings.maxOfOrNull { it.rssi } ?: 0 // Maximum RSSI
+                val avgRssi = readings.map { it.rssi }.average() // Average RSSI
+                val range = (maxRssi - minRssi).absoluteValue // Signal range
 
-                // Create row
-                val tableRow = TableRow(this@ComparisonActivity)
+                val tableRow = TableRow(this@ComparisonActivity) // Create table row
                 tableRow.layoutParams = TableLayout.LayoutParams(
                     TableLayout.LayoutParams.MATCH_PARENT,
                     TableLayout.LayoutParams.WRAP_CONTENT
                 )
                 tableRow.setPadding(4, 4, 4, 4)
 
-                // Add cells
-                addTextCell(tableRow, location.name)
-                addTextCell(tableRow, minRssi.toString())
-                addTextCell(tableRow, maxRssi.toString())
-                addTextCell(tableRow, String.format("%.1f", avgRssi))
-                addTextCell(tableRow, range.toString())
+                addTextCell(tableRow, location.name) // Add location name
+                addTextCell(tableRow, minRssi.toString()) // Add min RSSI
+                addTextCell(tableRow, maxRssi.toString()) // Add max RSSI
+                addTextCell(tableRow, String.format("%.1f", avgRssi)) // Add avg RSSI
+                addTextCell(tableRow, range.toString()) // Add signal range
 
-                // Add row to table
-                tableLayoutStats.addView(tableRow)
+                tableLayoutStats.addView(tableRow) // Add row to table
             }
         }
     }
 
     private fun addTextCell(row: TableRow, text: String) {
-        val textView = TextView(this)
+        val textView = TextView(this) // Create TextView
         textView.text = text
         textView.setPadding(8, 8, 8, 8)
         textView.gravity = Gravity.CENTER_VERTICAL
 
-        // Set layout parameters
         val layoutParams = TableRow.LayoutParams(
-            0, // Width - 0 means it will be weighted
+            0, // Width 0 for equal weight
             TableRow.LayoutParams.WRAP_CONTENT
         )
-        layoutParams.weight = 1f
+        layoutParams.weight = 1f // Equal weight for each cell
         layoutParams.setMargins(2, 2, 2, 2)
         textView.layoutParams = layoutParams
 
-        // Add to row
-        row.addView(textView)
+        row.addView(textView) // Add TextView to TableRow
     }
 }

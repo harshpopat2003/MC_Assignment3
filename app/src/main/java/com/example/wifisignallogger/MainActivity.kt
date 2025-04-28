@@ -21,16 +21,19 @@ import com.example.wifisignallogger.data.repository.WifiRepository
 
 class MainActivity : AppCompatActivity() {
 
+    // Adapter for displaying location list in RecyclerView
     private lateinit var locationAdapter: LocationAdapter
+    // Repository for accessing the wifi data from database
     private lateinit var wifiRepository: WifiRepository
 
-    // Permission request launcher
+    // Permission request launcher to handle permission requests (like ACCESS_FINE_LOCATION)
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
             if (locationGranted) {
-                // Permission granted
+                // If location permission is granted, nothing to do here
             } else {
+                // If permission is denied, show a toast with an error message
                 Toast.makeText(
                     this,
                     R.string.error_permission_denied,
@@ -43,43 +46,46 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Check and request permissions
+        // Check and request necessary permissions
         requestPermissions()
 
-        // Initialize database and repository
+        // Initialize the database and the repository
         val database = AppDatabase.getDatabase(this)
         wifiRepository = WifiRepository(database.locationDao(), database.wifiReadingDao())
 
-        // Setup RecyclerView
+        // Setup RecyclerView to display the list of locations
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewLocations)
         recyclerView.layoutManager = LinearLayoutManager(this)
         locationAdapter = LocationAdapter { location ->
-            // Handle location item click
+            // Handle item click - navigate to ScanActivity with location details
             val intent = Intent(this, ScanActivity::class.java)
             intent.putExtra("locationId", location.id)
             startActivity(intent)
         }
         recyclerView.adapter = locationAdapter
 
-        // Observe location changes
+        // Observe the list of locations from the database and update the adapter
         wifiRepository.allLocations.observe(this, Observer { locations ->
             locationAdapter.submitList(locations)
         })
 
-        // Setup buttons
+        // Button to start a new scan
         val buttonNewScan = findViewById<Button>(R.id.buttonNewScan)
         buttonNewScan.setOnClickListener {
             val intent = Intent(this, ScanActivity::class.java)
             startActivity(intent)
         }
 
+        // Button to compare the locations, but requires at least 3 locations
         val buttonCompare = findViewById<Button>(R.id.buttonCompare)
         buttonCompare.setOnClickListener {
-            // Check if we have at least 3 locations before allowing comparison
+            // Check if there are at least 3 locations for comparison
             wifiRepository.allLocationsWithReadings.observe(this, Observer { locations ->
                 if (locations.size >= 3) {
+                    // Start the ComparisonActivity if there are 3 or more locations
                     startActivity(Intent(this, ComparisonActivity::class.java))
                 } else {
+                    // Show a toast message if there are fewer than 3 locations
                     Toast.makeText(
                         this,
                         "Need at least 3 locations to compare. You have ${locations.size}.",
@@ -90,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Function to request necessary permissions for location and Wi-Fi access
     private fun requestPermissions() {
         val requiredPermissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -97,18 +104,21 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.CHANGE_WIFI_STATE
         )
 
-        // For Android 12+, add BLUETOOTH_SCAN permission
+        // For Android 12 and above, add BLUETOOTH_SCAN permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             requiredPermissions.add(Manifest.permission.BLUETOOTH_SCAN)
         }
 
+        // Check which permissions are missing
         val permissionsToRequest = requiredPermissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }.toTypedArray()
 
+        // If any permissions are missing, request them
         if (permissionsToRequest.isNotEmpty()) {
             requestPermissionLauncher.launch(permissionsToRequest)
         } else {
+            // Log a message if all necessary permissions are already granted
             Log.d("MainActivity", "All required permissions are already granted.")
         }
     }

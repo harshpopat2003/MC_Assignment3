@@ -1,4 +1,3 @@
-// WifiScanner.kt
 package com.example.wifisignallogger.util
 
 import android.content.BroadcastReceiver
@@ -11,32 +10,33 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 
+// Class to manage WiFi scanning and scan results
 class WifiScanner(private val context: Context) {
 
-    private val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-    private val scanResultsChannel = Channel<List<ScanResult>>(Channel.CONFLATED)
-    private var registered = false
+    private val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager // WiFi manager system service
+    private val scanResultsChannel = Channel<List<ScanResult>>(Channel.CONFLATED) // Channel for emitting scan results
+    private var registered = false // Whether receiver is registered
 
+    // BroadcastReceiver to handle WiFi scan results
     private val wifiScanReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
+            val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false) // Check if scan was successful
             if (success) {
-                val results = wifiManager.scanResults
-                scanResultsChannel.trySend(results)
+                val results = wifiManager.scanResults // Get scan results
+                scanResultsChannel.trySend(results) // Send results to channel
             } else {
-                scanResultsChannel.trySend(emptyList())
+                scanResultsChannel.trySend(emptyList()) // Send empty list if failed
             }
         }
     }
 
     init {
-        // Enable WiFi if it's not enabled
-        if (!wifiManager.isWifiEnabled) {
+        if (!wifiManager.isWifiEnabled) { // Enable WiFi if disabled
             wifiManager.isWifiEnabled = true
         }
     }
 
-    fun register() {
+    fun register() { // Register the BroadcastReceiver
         if (!registered) {
             val intentFilter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
             context.registerReceiver(wifiScanReceiver, intentFilter)
@@ -44,52 +44,42 @@ class WifiScanner(private val context: Context) {
         }
     }
 
-    fun unregister() {
+    fun unregister() { // Unregister the BroadcastReceiver
         if (registered) {
             try {
                 context.unregisterReceiver(wifiScanReceiver)
             } catch (e: Exception) {
-                // Receiver not registered
+                // Receiver not registered (ignore)
             }
             registered = false
         }
     }
 
-    fun startScan(): Boolean {
+    fun startScan(): Boolean { // Start a WiFi scan
         return wifiManager.startScan()
     }
 
-    fun getScanResultsFlow(): Flow<List<ScanResult>> {
+    fun getScanResultsFlow(): Flow<List<ScanResult>> { // Expose scan results as a Flow
         return scanResultsChannel.receiveAsFlow()
     }
 
-    fun getCurrentScanResults(): List<ScanResult> {
+    fun getCurrentScanResults(): List<ScanResult> { // Get the current WiFi scan results directly
         return wifiManager.scanResults
     }
 
     companion object {
-        // RSSI ranges from -100 dBm (weak) to about -30 dBm (strong)
-        const val MIN_RSSI = -100
-        const val MAX_RSSI = -30
+        const val MIN_RSSI = -100 // Minimum expected RSSI value (weak signal)
+        const val MAX_RSSI = -30 // Maximum expected RSSI value (strong signal)
 
-        // Map RSSI to a 0-100 scale for visualization
-        fun mapRssiToStrength(rssi: Int): Int {
+        fun mapRssiToStrength(rssi: Int): Int { // Normalize RSSI to 0–100 scale
             return ((rssi - MIN_RSSI) * 100.0 / (MAX_RSSI - MIN_RSSI)).toInt().coerceIn(0, 100)
         }
 
-        // Map RSSI to a color (red = weak, green = strong)
-        fun mapRssiToColor(rssi: Int): Int {
+        fun mapRssiToColor(rssi: Int): Int { // Map RSSI strength to a color (red weak, green strong)
             val normalizedStrength = mapRssiToStrength(rssi).toFloat() / 100f
-
-            // Red component (for weak signal)
-            val r = ((1f - normalizedStrength) * 255).toInt()
-
-            // Green component (for strong signal)
-            val g = (normalizedStrength * 255).toInt()
-
-            // Blue component (fixed at 0)
-            val b = 0
-
+            val r = ((1f - normalizedStrength) * 255).toInt() // Red intensity (weaker signal = more red)
+            val g = (normalizedStrength * 255).toInt() // Green intensity (stronger signal = more green)
+            val b = 0 // Blue intensity fixed at 0
             return android.graphics.Color.rgb(r, g, b)
         }
     }
