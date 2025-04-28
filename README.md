@@ -1,7 +1,19 @@
-# MC_assignment3
+# Wifi Signal Logger
 
 ## Overview
 This project is a WiFi Signal Logger application for Android that scans available WiFi networks and logs their signal strengths. The app then displays these values in a matrix format and allows comparisons between different scans.
+
+## App ScreenShot
+
+### Main Homepage screen
+<img src=./images/home_screen.jpg  alt="Home Screen" width="200"/>
+
+### Wifi Scan Screen
+<img src=./images/wifi_scan_screen,jpg  alt="flight Screen" width="200"/>
+
+### Wifi signal Comparison Screen
+<img src=./images/comparison_screen.jpg  alt="stored Screen" width="200"/>
+
 
 ## Key Functionalities
 
