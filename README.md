@@ -3,6 +3,19 @@
 ## Introduction
 Matrix Calculator Android app that allows users to perform basic matrix operations including addition, subtraction, multiplication, and division using a combination of Kotlin and native C++ code.
 
+## App ScreenShot
+
+### Main Homepage screen
+<img src=./images/main_homepage.jpg  alt="Main Screen" width="200"/>
+
+### Calculating results 
+<img src=./images/calculation_res.jpg  alt="flight Screen" width="200"/>
+
+### All Operation Available 
+<img src=./images/operations_avl.jpg  alt="operations" width="200"/>
+
+
+
 ## Features
 - Define and validate matrix dimensions with input constraints (min: 1, max: 10)
 - Perform matrix arithmetic operations:
