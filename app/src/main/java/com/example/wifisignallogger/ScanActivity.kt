@@ -2,6 +2,7 @@ package com.example.wifisignallogger
 
 import android.net.wifi.ScanResult
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -126,30 +127,33 @@ class ScanActivity : AppCompatActivity() {
                 // Register WiFi scanner
                 wifiScanner.register()
 
-                // Collect 100 readings or as many as possible
+                // Collect readings until we have at least 100 RSSI values
                 val allReadings = mutableListOf<ScanResult>()
-                var scanCount = 0
-                val maxScans = 10 // Will do 10 scans with hopefully 10 APs each = 100 readings
+                while (allReadings.size < 100) {
+                    // Start a scan
+                    wifiScanner.startScan()
 
-                // Collect scan results
-                withContext(Dispatchers.IO) {
-                    while (scanCount < maxScans) {
-                        // Start a scan
-                        wifiScanner.startScan()
+                    // Wait for results
+                    delay(1000)
 
-                        // Wait for results
-                        delay(1000)
+                    // Get results
+                    val currentResults = wifiScanner.getCurrentScanResults()
 
-                        // Get results
-                        val currentResults = wifiScanner.getCurrentScanResults()
-                        allReadings.addAll(currentResults)
+                    // Log each scan's result count
+                    Log.d("ScanActivity", "Scan iteration returned ${currentResults.size} results, total readings: ${allReadings.size}")
 
-                        // Update progress
-                        scanCount++
-                        withContext(Dispatchers.Main) {
-                            val progress = scanCount * 100 / maxScans
-                            progressBarScanning.progress = progress
-                        }
+                    allReadings.addAll(currentResults)
+
+                    // Update progress
+                    withContext(Dispatchers.Main) {
+                        progressBarScanning.progress = allReadings.size.coerceAtMost(100)
+                    }
+                }
+
+                // Warn the user if no access points were detected
+                if (allReadings.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@ScanActivity, "No WiFi access points detected.", Toast.LENGTH_LONG).show()
                     }
                 }
 
@@ -183,11 +187,8 @@ class ScanActivity : AppCompatActivity() {
     }
 
     private fun processReadings(scanResults: List<ScanResult>, locationId: Long): List<WifiReading> {
-        // Get unique APs by BSSID
-        val uniqueAps = scanResults.distinctBy { it.BSSID }
-
-        // Create a list of WifiReading objects - Make it a MutableList so we can add to it
-        val readings = uniqueAps.take(100).mapIndexed { index, scanResult ->
+        // Use the first 100 RSSI readings as-is
+        return scanResults.take(100).mapIndexed { index, scanResult ->
             WifiReading(
                 locationId = locationId,
                 ssid = scanResult.SSID.ifEmpty { "<Hidden>" },
@@ -196,26 +197,7 @@ class ScanActivity : AppCompatActivity() {
                 frequency = scanResult.frequency,
                 index = index
             )
-        }.toMutableList()  // Convert to MutableList so we can add more items
-
-        // If we have less than 100 readings, fill the rest with dummy values
-        val fillerCount = 100 - readings.size
-        if (fillerCount > 0) {
-            for (i in 0 until fillerCount) {
-                readings.add(
-                    WifiReading(
-                        locationId = locationId,
-                        ssid = "Dummy ${i+1}",
-                        bssid = "00:00:00:00:00:${i.toString().padStart(2, '0')}",
-                        rssi = -100, // Weakest signal
-                        frequency = 2400,
-                        index = readings.size + i
-                    )
-                )
-            }
         }
-
-        return readings
     }
 
     override fun onDestroy() {
